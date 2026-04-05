@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.env
+node_modules/
+frontend/dist/
+*.docx
+!templates/**/*.docx
+
+# Company / workspace data (keep corporate assets out of git)
+/data/workspace/**
+!/data/workspace/.example/
+!/data/workspace/.example/**
+
+# Optional private docs under repo
+docs/private/
+
+# RAG vector store (local SQLite and any generated index folders)
+rag_index/
+**/rag_index/

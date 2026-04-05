@@ -1,0 +1,10 @@
+<h1 style="text-align: center">Договор поставки № {{ contract_no | default('____') }}</h1>
+<p><br></p>
+<p><strong>г. {{ city | default('Москва') }}</strong> «{{ contract_date | default('___') }}»</p>
+<p><br></p>
+<h2>1. Предмет договора</h2>
+<p>{{ subject | default('[уточнить предмет]') }}</p>
+<h2>2. Цена и расчёты</h2>
+<p>Сумма: <strong>{{ amount | default('________') }}</strong></p>
+<table><tbody><tr><td><strong>Поставщик</strong></td><td><strong>Покупатель</strong></td></tr>
+<tr><td>{{ supplier_name | default('') }}</td><td>{{ buyer_name | default('') }}</td></tr></tbody></table>
