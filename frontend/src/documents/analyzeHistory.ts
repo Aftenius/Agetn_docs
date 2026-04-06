@@ -1,3 +1,5 @@
+import { randomUUID } from "../utils/randomUUID";
+
 export type Finding = {
   item: string;
   severity?: string;
@@ -73,7 +75,7 @@ export function appendAnalyzeHistory(
 ): AnalyzeHistoryEntry {
   const all = readAll();
   const row: AnalyzeHistoryEntry = {
-    id: entry.id ?? crypto.randomUUID(),
+    id: entry.id ?? randomUUID(),
     at: entry.at,
     agentId: entry.agentId,
     agentName: entry.agentName,

@@ -1,3 +1,5 @@
+import { randomUUID } from "../utils/randomUUID";
+
 export type StoredDocument = {
   id: string;
   title: string;
@@ -48,7 +50,7 @@ function ensureMigrated() {
   const legacy = localStorage.getItem(LEGACY_EDITOR_KEY)?.trim();
   if (legacy) {
     const doc: StoredDocument = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       title: deriveTitle(legacy),
       html: legacy,
       updatedAt: new Date().toISOString(),
@@ -102,7 +104,7 @@ export function createDocument(
   const docs = readRaw();
   const now = new Date().toISOString();
   const doc: StoredDocument = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     title: title ?? deriveTitle(html),
     html,
     updatedAt: now,

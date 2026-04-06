@@ -1,4 +1,5 @@
 import type { Editor, JSONContent } from "@tiptap/core";
+import { randomUUID } from "../utils/randomUUID";
 
 export type HeadingForToc = {
   level: number;
@@ -30,7 +31,7 @@ export function ensureHeadingIds(editor: Editor): boolean {
     const level = node.attrs.level as number;
     if (level > 3) return;
     if (node.attrs.id) return;
-    const id = `h-${crypto.randomUUID().slice(0, 10)}`;
+    const id = `h-${randomUUID().slice(0, 10)}`;
     tr.setNodeMarkup(pos, undefined, {
       ...node.attrs,
       id,
