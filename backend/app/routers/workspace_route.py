@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.schemas import (
     AGENT_ID_PATTERN,
@@ -18,7 +18,12 @@ from app.services.agents_loader import (
     save_workspace_agent,
 )
 from app.services.requirements_loader import checklist_api_dict, save_workspace_checklist_json
-from app.services.rag_service import ingest_file, rag_status
+from app.services.rag_service import (
+    clear_all_chunks,
+    delete_chunks_by_source,
+    ingest_file,
+    rag_status,
+)
 from app.services.workspace import invalidate_caches_after_settings_change, rag_inbox_dir
 
 log = logging.getLogger(__name__)
@@ -90,6 +95,27 @@ async def rag_ingest_route(file: UploadFile = File(...)):
     n = ingest_file(dest, original_name=safe)
     log.info("workspace.rag.ingest file=%s chunks_added=%s", safe, n)
     return {"filename": safe, "chunks_added": n}
+
+
+@router.delete("/rag/source")
+def rag_delete_source_route(
+    name: str = Query(..., min_length=1, description="Имя файла как в индексе (как при загрузке)"),
+):
+    n = delete_chunks_by_source(name)
+    if n == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Источник не найден в индексе (проверьте имя файла в списке корпуса)",
+        )
+    log.info("workspace.rag.delete_source name=%s chunks_removed=%s", name, n)
+    return {"ok": True, "source": name, "chunks_removed": n}
+
+
+@router.post("/rag/clear")
+def rag_clear_route():
+    n = clear_all_chunks()
+    log.info("workspace.rag.clear chunks_removed=%s", n)
+    return {"ok": True, "chunks_removed": n}
 
 
 @router.get("/checklist")

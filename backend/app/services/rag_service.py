@@ -166,6 +166,10 @@ def rag_status() -> dict:
             "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL"
         ).fetchone()
         ne = int(with_emb[0]) if with_emb else 0
+        cur = conn.execute(
+            "SELECT source, COUNT(*) AS c FROM chunks GROUP BY source ORDER BY source COLLATE NOCASE"
+        )
+        sources = [{"source": str(s), "chunks": int(c)} for s, c in cur.fetchall()]
     finally:
         conn.close()
     return {
@@ -173,6 +177,7 @@ def rag_status() -> dict:
         "chunks_with_embeddings": ne,
         "embeddings_configured": bool(embedding_api_key()),
         "db_path": str(_db_path()),
+        "sources": sources,
     }
 
 
@@ -211,3 +216,30 @@ def retrieve_for_query(query: str, top_k: int = 5) -> tuple[str, int]:
             continue
         parts.append(f"[{label}]\n{t[:2000]}")
     return "\n\n---\n\n".join(parts), total
+
+
+def delete_chunks_by_source(source: str) -> int:
+    """Удаляет все чанки с указанным полем source (как при индексации)."""
+    name = (source or "").strip()
+    if not name:
+        return 0
+    conn = sqlite3.connect(_db_path())
+    try:
+        _init_db(conn)
+        cur = conn.execute("DELETE FROM chunks WHERE source = ?", (name,))
+        conn.commit()
+        return int(cur.rowcount or 0)
+    finally:
+        conn.close()
+
+
+def clear_all_chunks() -> int:
+    """Удаляет все строки из индекса RAG."""
+    conn = sqlite3.connect(_db_path())
+    try:
+        _init_db(conn)
+        cur = conn.execute("DELETE FROM chunks")
+        conn.commit()
+        return int(cur.rowcount or 0)
+    finally:
+        conn.close()

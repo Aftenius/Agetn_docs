@@ -155,6 +155,15 @@ function Results({ data }: { data: AnalyzePayload }) {
         </>
       ) : null}
 
+      {data.rag_sources_used && data.rag_sources_used.length > 0 ? (
+        <>
+          <div className="section-title">Опора корпуса</div>
+          <p className="muted rag-sources-used">
+            {data.rag_sources_used.join(", ")}
+          </p>
+        </>
+      ) : null}
+
       <DoNotDiscloseBlock items={data.do_not_disclose_to_client ?? []} />
 
       {data.red_flags && data.red_flags.length > 0 ? (

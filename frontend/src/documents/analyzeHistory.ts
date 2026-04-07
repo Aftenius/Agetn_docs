@@ -29,6 +29,8 @@ export type AnalyzePayload = {
   red_flags?: string[];
   /** Нельзя передавать заказчику — показываем с максимальным акцентом */
   do_not_disclose_to_client?: DoNotDiscloseItem[];
+  /** Метки фрагментов корпуса RAG, на которые опирался анализ (имя_файла#N) */
+  rag_sources_used?: string[];
 };
 
 export type AnalyzeHistoryEntry = {

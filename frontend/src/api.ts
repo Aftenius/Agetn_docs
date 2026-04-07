@@ -151,11 +151,15 @@ export async function patchWorkspaceSettings(
   return r.json();
 }
 
+export type RagSourceStat = { source: string; chunks: number };
+
 export type RagStatus = {
   chunks: number;
   chunks_with_embeddings: number;
   embeddings_configured: boolean;
   db_path: string;
+  /** Список файлов в индексе (может отсутствовать у старых бэкендов) */
+  sources?: RagSourceStat[];
 };
 
 export async function fetchRagStatus(): Promise<RagStatus> {
@@ -175,6 +179,28 @@ export async function ingestRagFile(file: File): Promise<{
     body: fd,
   });
   if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteRagSource(filename: string): Promise<{
+  ok: boolean;
+  source: string;
+  chunks_removed: number;
+}> {
+  const r = await fetch(
+    `${API}/api/workspace/rag/source?name=${encodeURIComponent(filename)}`,
+    { method: "DELETE" }
+  );
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  return r.json();
+}
+
+export async function clearRagCorpus(): Promise<{
+  ok: boolean;
+  chunks_removed: number;
+}> {
+  const r = await fetch(`${API}/api/workspace/rag/clear`, { method: "POST" });
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
   return r.json();
 }
 

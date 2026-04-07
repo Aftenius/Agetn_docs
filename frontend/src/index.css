@@ -1097,6 +1097,90 @@ select {
   color: #137333;
 }
 
+.workspace-rag-sources {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #fafafa;
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+}
+
+.workspace-rag-sources-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #3c4043;
+}
+
+.workspace-rag-source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.workspace-rag-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.workspace-rag-source-name {
+  flex: 1 1 140px;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.workspace-rag-source-count {
+  color: #5f6368;
+  white-space: nowrap;
+}
+
+.workspace-rag-remove {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--doc-border);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.workspace-rag-remove:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.workspace-rag-danger {
+  margin-top: 0.75rem;
+}
+
+.workspace-rag-clear {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  border: 1px solid #c5221f;
+  color: #c5221f;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.workspace-rag-clear:hover:not(:disabled) {
+  background: #fce8e6;
+}
+
+.workspace-rag-clear:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rag-sources-used {
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
 .workspace-agents {
   border-top: 1px solid var(--doc-border);
   padding: 1.5rem 0;
