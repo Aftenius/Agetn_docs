@@ -32,6 +32,7 @@ def ensure_workspace_dirs() -> Path:
         "samples",
         "rag/inbox",
         "rag_index",
+        "documents",
     ):
         (root / sub).mkdir(parents=True, exist_ok=True)
     return root
@@ -111,8 +112,21 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "language": "ru",
     "generation": {
         "structure_instructions": "",
+        "vat_rate_percent": 22,
     },
 }
+
+
+def get_vat_rate_percent() -> int:
+    """Ставка НДС для договоров (из settings.yaml → generation.vat_rate_percent)."""
+    s = load_settings_dict()
+    gen = s.get("generation") if isinstance(s.get("generation"), dict) else {}
+    raw = gen.get("vat_rate_percent", DEFAULT_SETTINGS["generation"]["vat_rate_percent"])
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = 22
+    return max(0, min(100, n))
 
 
 def load_settings_dict() -> dict[str, Any]:
@@ -163,15 +177,25 @@ def structure_instructions_for_prompt() -> str:
         lines.append(f"Язык документов: {language}.")
     if block:
         lines.append("Доп. инструкции по структуре и оформлению от организации:\n" + block)
+    rate = get_vat_rate_percent()
+    lines.append(
+        f"Ставка НДС по умолчанию для документов (если не «без НДС»): {rate}%."
+    )
     return "\n".join(lines).strip()
+
+
+def documents_workspace_dir() -> Path:
+    return get_workspace_root() / "documents"
 
 
 def invalidate_caches_after_settings_change() -> None:
     """Clear loader caches if settings or files on disk may have changed."""
     import app.services.agents_loader as agents_loader
+    import app.services.companies_loader as companies_loader
     import app.services.requirements_loader as requirements_loader
 
     agents_loader.load_agents.cache_clear()
+    companies_loader.load_companies_list.cache_clear()
     requirements_loader._checklist_bundle.cache_clear()
     requirements_loader.load_requirements_text.cache_clear()
     requirements_loader.load_checklist_json.cache_clear()

@@ -6,7 +6,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.routers import analyze, docs_route, export_route, generate, import_docx, workspace_route
+from app.routers import (
+    analyze,
+    docs_route,
+    documents_route,
+    export_route,
+    generate,
+    import_docx,
+    util_route,
+    workspace_route,
+)
 
 _level_name = os.getenv("LOG_LEVEL", "INFO").upper()
 _level = getattr(logging, _level_name, logging.INFO)
@@ -18,14 +27,21 @@ logging.basicConfig(
 
 app = FastAPI(title="Docs-agent API", version="0.1.0")
 
+_default_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+]
+_extra = os.getenv("DOCS_AGENT_CORS_ORIGINS", "").strip()
+if _extra:
+    _allowed = list(dict.fromkeys(_default_origins + [x.strip() for x in _extra.split(",") if x.strip()]))
+else:
+    _allowed = _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:8000",
-        "http://localhost:8000",
-    ],
+    allow_origins=_allowed,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +53,8 @@ app.include_router(generate.router)
 app.include_router(export_route.router)
 app.include_router(import_docx.router)
 app.include_router(workspace_route.router)
+app.include_router(documents_route.router)
+app.include_router(util_route.router)
 
 
 @app.get("/api/health")

@@ -1,5 +1,18 @@
 const API = "";
 
+/** Сообщение при обрыве сети / CORS (в т.ч. «Failed to fetch»). */
+export function networkErrorMessage(err: unknown): string {
+  if (err instanceof TypeError) {
+    return (
+      "Нет связи с сервером. Запустите backend (из каталога backend: uvicorn app.main:app), " +
+      "используйте dev-режим фронта на порту 5173 (прокси /api) или откройте собранный SPA с порта 8000. " +
+      "При доступе с другого адреса задайте в .env переменную DOCS_AGENT_CORS_ORIGINS."
+    );
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 /** Текст ошибки API (в т.ч. разбор FastAPI 422 validation). */
 export async function readApiErrorMessage(r: Response): Promise<string> {
   const t = await r.text();
@@ -55,29 +68,152 @@ export async function analyzeContract(
   html: string,
   agentId: string
 ): Promise<unknown> {
-  const r = await fetch(`${API}/api/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ html, agent_id: agentId }),
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(t);
+  try {
+    const r = await fetch(`${API}/api/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html, agent_id: agentId }),
+    });
+    if (!r.ok) {
+      throw new Error(await readApiErrorMessage(r));
+    }
+    return r.json();
+  } catch (e) {
+    if (e instanceof TypeError) {
+      throw new Error(networkErrorMessage(e));
+    }
+    throw e;
   }
-  return r.json();
 }
 
-export async function generateStructure(body: {
+export type GenerateStructureBody = {
   title: string;
   subject: string;
-}): Promise<{ html: string }> {
+  contract_format?: string;
+  company_id?: string | null;
+  our_party?: string;
+  vat_mode?: string;
+  vat_note?: string;
+  total_amount?: string;
+  amount_in_words?: string;
+  acceptance_days?: number | null;
+  payment_schedule_text?: string;
+  extra_terms?: string;
+  contract_number?: string;
+  contract_date?: string;
+};
+
+export async function generateStructure(
+  body: GenerateStructureBody
+): Promise<{ html: string }> {
   const r = await fetch(`${API}/api/generate-structure`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
   return r.json();
+}
+
+export async function fetchAmountInWords(value: string): Promise<{
+  value: string;
+  words: string;
+}> {
+  const r = await fetch(
+    `${API}/api/amount-in-words?${new URLSearchParams({ value })}`
+  );
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  return r.json();
+}
+
+export type WorkspaceCompany = {
+  id: string;
+  display_name: string;
+  full_legal_name: string;
+  address_legal: string;
+  ogrn: string;
+  inn: string;
+  kpp: string;
+  address_postal: string;
+  bank_name: string;
+  rs: string;
+  ks: string;
+  bik: string;
+  signatory_title: string;
+  signatory_name: string;
+};
+
+export async function fetchWorkspaceCompanies(): Promise<WorkspaceCompany[]> {
+  const r = await fetch(`${API}/api/workspace/companies`);
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  const j = await r.json();
+  return j.companies ?? [];
+}
+
+export async function putWorkspaceCompanies(
+  companies: WorkspaceCompany[]
+): Promise<{ companies: WorkspaceCompany[] }> {
+  const r = await fetch(`${API}/api/workspace/companies`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ companies }),
+  });
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  return r.json();
+}
+
+export type ServerDocument = {
+  id: string;
+  title: string;
+  html: string;
+  updatedAt: string;
+};
+
+export async function fetchDocumentsListApi(): Promise<ServerDocument[]> {
+  const r = await fetch(`${API}/api/documents`);
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  const j = await r.json();
+  return j.documents ?? [];
+}
+
+export async function fetchDocumentApi(
+  id: string
+): Promise<ServerDocument | null> {
+  const r = await fetch(`${API}/api/documents/${encodeURIComponent(id)}`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+  return r.json();
+}
+
+export async function postDocumentApi(doc: ServerDocument): Promise<void> {
+  const r = await fetch(`${API}/api/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: doc.id,
+      title: doc.title,
+      html: doc.html,
+    }),
+  });
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+}
+
+export async function putDocumentApi(doc: ServerDocument): Promise<void> {
+  const r = await fetch(`${API}/api/documents/${encodeURIComponent(doc.id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: doc.title, html: doc.html }),
+  });
+  if (!r.ok) throw new Error(await readApiErrorMessage(r));
+}
+
+export async function deleteDocumentApi(id: string): Promise<void> {
+  const r = await fetch(`${API}/api/documents/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!r.ok && r.status !== 404) {
+    throw new Error(await readApiErrorMessage(r));
+  }
 }
 
 export async function generateDraft(body: {
@@ -124,7 +260,11 @@ export type WorkspaceSettings = {
   company_name: string;
   jurisdiction: string;
   language: string;
-  generation: { structure_instructions?: string };
+  generation: {
+    structure_instructions?: string;
+    /** Ставка НДС для генерации и промптов (по умолчанию на бэкенде 22). */
+    vat_rate_percent?: number;
+  };
   workspace_root: string;
 };
 
@@ -139,7 +279,10 @@ export async function patchWorkspaceSettings(
     company_name: string;
     jurisdiction: string;
     language: string;
-    generation: { structure_instructions: string };
+    generation: {
+      structure_instructions?: string;
+      vat_rate_percent?: number;
+    };
   }>
 ): Promise<WorkspaceSettings> {
   const r = await fetch(`${API}/api/workspace/settings`, {

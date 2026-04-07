@@ -1,5 +1,6 @@
 import logging
 import time
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -10,17 +11,102 @@ from app.services.deepseek import (
     generate_draft,
     get_client,
 )
+from app.services.companies_loader import (
+    format_company_for_structure_prompt,
+    get_company_by_id,
+)
 from app.services.docs_scanner import extract_text_sample
+from app.services.money_ru import amount_in_words_rubles, payment_schedule_breakdown_rubles
 from app.services.rag_service import retrieve_for_query
 from app.services.requirements_loader import (
     load_contract_template_docx_html,
     load_requirements_text,
 )
-from app.services.workspace import structure_instructions_for_prompt, templates_contracts_repo_dir, templates_contracts_workspace_dir
+from app.services.workspace import (
+    get_vat_rate_percent,
+    structure_instructions_for_prompt,
+    templates_contracts_repo_dir,
+    templates_contracts_workspace_dir,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["generate"])
+
+
+def _parse_total(amount_str: str) -> Decimal | None:
+    s = (amount_str or "").strip().replace(" ", "").replace(",", ".")
+    if not s:
+        return None
+    try:
+        d = Decimal(s)
+    except (InvalidOperation, ValueError):
+        return None
+    return d if d > 0 else None
+
+
+def build_structure_structured_context(req: GenerateStructureRequest) -> str:
+    parts: list[str] = []
+    if (req.contract_format or "supply").lower() == "supply":
+        parts.append("Форма договора: договор поставки товаров.")
+    else:
+        parts.append(f"Форма договора: {req.contract_format}.")
+
+    if req.contract_number.strip() or req.contract_date.strip():
+        parts.append(
+            "Шапка (используй в <h1> и строке города/даты): № "
+            f"{req.contract_number.strip() or '[уточнить: номер]'} от "
+            f"{req.contract_date.strip() or '[уточнить: дата]'}"
+        )
+
+    if req.company_id and (c := get_company_by_id(req.company_id)):
+        parts.append(
+            format_company_for_structure_prompt(c, our_party=req.our_party)
+        )
+
+    total = _parse_total(req.total_amount)
+    words = (req.amount_in_words or "").strip()
+    if not words and total is not None:
+        words = amount_in_words_rubles(total)
+    total_block: list[str] = []
+    if total is not None:
+        total_block.append(f"Сумма договора (цифрами): {total} руб.")
+    if words:
+        total_block.append(f"Сумма договора прописью: {words}")
+    if total_block:
+        parts.append("\n".join(total_block))
+
+    vat_pct = get_vat_rate_percent()
+    if req.vat_mode == "no_vat":
+        note = (req.vat_note or "").strip() or "участник инновационного центра / иное основание — уточнить в тексте"
+        parts.append(
+            f"НДС: без НДС. Кратко укажи основание: {note}. Не указывай НДС со ставкой {vat_pct}% или иной числовой ставкой."
+        )
+    else:
+        parts.append(
+            f"НДС: ставка {vat_pct}% («в том числе НДС {vat_pct}%» или эквивалентная формулировка). "
+            "Не указывай иную процентную ставку НДС, кроме указанной выше и в настройках организации."
+        )
+
+    if req.acceptance_days is not None:
+        parts.append(
+            f"Срок приёмки: оборудования/товара — не позднее {req.acceptance_days} календарных дней "
+            "(сформулируй в разделе о приёмке)."
+        )
+
+    if (req.payment_schedule_text or "").strip():
+        parts.append("Описание графика оплаты от пользователя:\n" + req.payment_schedule_text.strip())
+        if total is not None:
+            br = payment_schedule_breakdown_rubles(total, req.payment_schedule_text)
+            if br:
+                parts.append(br)
+
+    if (req.extra_terms or "").strip():
+        parts.append("Дополнительные условия:\n" + req.extra_terms.strip())
+
+    return "\n\n".join(parts).strip()
+
+
 
 _env: Environment | None = None
 
@@ -131,7 +217,8 @@ def generate_structure_route(req: GenerateStructureRequest):
     requirements = load_requirements_text()
     org_block = structure_instructions_for_prompt()
     t_rag = time.perf_counter()
-    q = f"{req.title.strip()}\n{req.subject.strip()}"
+    struct_ctx = build_structure_structured_context(req)
+    q = f"{req.title.strip()}\n{req.subject.strip()}\n{struct_ctx[:4000]}"
     rag_ctx, nchunks = retrieve_for_query(q)
     log.info(
         "generate_structure rag_retrieve elapsed_s=%.3f index_chunks=%s",
@@ -147,6 +234,7 @@ def generate_structure_route(req: GenerateStructureRequest):
             requirements_context=requirements,
             organization_context=org_block,
             rag_context=rag_ctx,
+            structured_context=struct_ctx,
         )
     except Exception as e:
         raise HTTPException(

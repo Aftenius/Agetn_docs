@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { WorkspaceAgentsSection } from "./WorkspaceAgentsSection";
 import { WorkspaceChecklistSection } from "./WorkspaceChecklistSection";
+import { WorkspaceCompaniesSection } from "./WorkspaceCompaniesSection";
 
 export function WorkspaceSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,7 @@ export function WorkspaceSettingsPage() {
   const [jurisdiction, setJurisdiction] = useState("");
   const [language, setLanguage] = useState("ru");
   const [structureInstructions, setStructureInstructions] = useState("");
+  const [vatRatePercent, setVatRatePercent] = useState(22);
   const [rag, setRag] = useState<RagStatus | null>(null);
   const [ingestMsg, setIngestMsg] = useState<string | null>(null);
   const [ragBusy, setRagBusy] = useState(false);
@@ -39,6 +41,10 @@ export function WorkspaceSettingsPage() {
         setJurisdiction(s.jurisdiction ?? "");
         setLanguage(s.language ?? "ru");
         setStructureInstructions(s.generation?.structure_instructions ?? "");
+        const vr = s.generation?.vat_rate_percent;
+        setVatRatePercent(
+          typeof vr === "number" && vr >= 0 && vr <= 100 ? vr : 22
+        );
         setRag(rs);
       } catch (e) {
         if (!cancelled) {
@@ -65,7 +71,10 @@ export function WorkspaceSettingsPage() {
         company_name: companyName,
         jurisdiction,
         language,
-        generation: { structure_instructions: structureInstructions },
+        generation: {
+          structure_instructions: structureInstructions,
+          vat_rate_percent: Math.min(100, Math.max(0, Math.round(vatRatePercent))),
+        },
       });
       setSettings(s);
       window.alert("Сохранено.");
@@ -197,6 +206,22 @@ export function WorkspaceSettingsPage() {
           />
         </label>
         <label className="workspace-field">
+          <span>Ставка НДС для договоров (%)</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={vatRatePercent}
+            onChange={(e) =>
+              setVatRatePercent(parseInt(e.target.value, 10) || 0)
+            }
+          />
+          <span className="docs-home-hint" style={{ marginTop: "0.25rem" }}>
+            Используется в генерации структуры и текстах «в том числе НДС …%».
+            При «Без НДС» в мастере ставка не подставляется.
+          </span>
+        </label>
+        <label className="workspace-field">
           <span>Инструкции по структуре генерации</span>
           <textarea
             value={structureInstructions}
@@ -213,6 +238,8 @@ export function WorkspaceSettingsPage() {
       </form>
 
       <WorkspaceChecklistSection />
+
+      <WorkspaceCompaniesSection />
 
       <WorkspaceAgentsSection />
 

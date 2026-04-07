@@ -1,13 +1,20 @@
 import {
   type ChangeEvent,
   type MouseEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { importDocx } from "./api";
-import { createDocument, deleteDocument, listDocuments, type StoredDocument } from "./documents/store";
+import {
+  createDocument,
+  deleteDocument,
+  listDocuments,
+  syncDocumentsFromServer,
+  type StoredDocument,
+} from "./documents/store";
 import { NewDocumentModal } from "./NewDocumentModal";
 
 async function fileToHtml(file: File): Promise<string> {
@@ -33,12 +40,33 @@ async function fileToHtml(file: File): Promise<string> {
 export function DocumentsHome() {
   const [listVersion, setListVersion] = useState(0);
   const [newModalOpen, setNewModalOpen] = useState(false);
+  const [serverHint, setServerHint] = useState<string | null>(null);
   const navigate = useNavigate();
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const docs = useMemo(() => listDocuments(), [listVersion]);
 
   const refresh = () => setListVersion((v) => v + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const ok = await syncDocumentsFromServer();
+      if (!cancelled) {
+        if (ok) {
+          refresh();
+          setServerHint(null);
+        } else {
+          setServerHint(
+            "Документы только в браузере: сервер недоступен или каталог workspace/documents не отвечает."
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,9 +120,15 @@ export function DocumentsHome() {
         </div>
       </header>
       <p className="docs-home-hint">
-        Файлы хранятся локально в браузере. Поддерживаются HTML, TXT и DOCX
-        (конвертация через сервер).
+        Черновики синхронизируются с сервером (каталог <code>workspace/documents</code>
+        при работающем backend). В браузере остаётся копия. Поддерживаются HTML, TXT и
+        DOCX (конвертация через сервер).
       </p>
+      {serverHint ? (
+        <p className="docs-home-hint" style={{ color: "#b06000" }}>
+          {serverHint}
+        </p>
+      ) : null}
       {docs.length === 0 ? (
         <p className="docs-home-empty">Нет сохранённых документов.</p>
       ) : (

@@ -1,3 +1,10 @@
+import {
+  deleteDocumentApi,
+  fetchDocumentApi,
+  fetchDocumentsListApi,
+  postDocumentApi,
+  putDocumentApi,
+} from "../api";
 import { randomUUID } from "../utils/randomUUID";
 
 export type StoredDocument = {
@@ -73,6 +80,59 @@ function readRaw(): StoredDocument[] {
   }
 }
 
+function normalizeServerRow(row: {
+  id: string;
+  title?: string;
+  html?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}): StoredDocument {
+  return {
+    id: row.id,
+    title: row.title ?? "",
+    html: row.html ?? "",
+    updatedAt: row.updatedAt || row.updated_at || new Date().toISOString(),
+  };
+}
+
+/** Подтянуть список документов с сервера в localStorage. false = сеть или ошибка API. */
+export async function syncDocumentsFromServer(): Promise<boolean> {
+  try {
+    const rows = await fetchDocumentsListApi();
+    const docs = rows.map((r) => normalizeServerRow(r));
+    const local = readRaw();
+    if (docs.length > 0) {
+      writeRaw(docs);
+    } else if (local.length === 0) {
+      writeRaw([]);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Если документа нет локально — запросить у сервера и добавить в хранилище. */
+export async function ensureDocumentLoaded(
+  id: string
+): Promise<StoredDocument | null> {
+  const local = getDocument(id);
+  if (local) return local;
+  try {
+    const row = await fetchDocumentApi(id);
+    if (!row) return null;
+    const doc = normalizeServerRow(row);
+    const docs = readRaw();
+    if (!docs.some((d) => d.id === doc.id)) {
+      docs.push(doc);
+      writeRaw(docs);
+    }
+    return doc;
+  } catch {
+    return null;
+  }
+}
+
 export function listDocuments(): StoredDocument[] {
   return readRaw()
     .slice()
@@ -111,6 +171,12 @@ export function createDocument(
   };
   docs.push(doc);
   writeRaw(docs);
+  void postDocumentApi({
+    id: doc.id,
+    title: doc.title,
+    html: doc.html,
+    updatedAt: doc.updatedAt,
+  }).catch(() => {});
   return doc;
 }
 
@@ -129,6 +195,12 @@ export function updateDocument(
   };
   docs[i] = next;
   writeRaw(docs);
+  void putDocumentApi({
+    id: next.id,
+    title: next.title,
+    html: next.html,
+    updatedAt: next.updatedAt,
+  }).catch(() => {});
   return next;
 }
 
@@ -137,5 +209,6 @@ export function deleteDocument(id: string): boolean {
   const next = docs.filter((d) => d.id !== id);
   if (next.length === docs.length) return false;
   writeRaw(next);
+  void deleteDocumentApi(id).catch(() => {});
   return true;
 }

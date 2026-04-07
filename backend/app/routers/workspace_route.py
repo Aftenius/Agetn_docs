@@ -6,7 +6,9 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from app.schemas import (
     AGENT_ID_PATTERN,
     ChecklistPutBody,
+    CompaniesPutBody,
     WorkspaceAgentUpsert,
+    WorkspaceCompany,
     WorkspaceSettingsPatch,
 )
 from app.services import workspace as ws
@@ -17,6 +19,7 @@ from app.services.agents_loader import (
     load_agents,
     save_workspace_agent,
 )
+from app.services.companies_loader import load_companies_list, save_companies_list
 from app.services.requirements_loader import checklist_api_dict, save_workspace_checklist_json
 from app.services.rag_service import (
     clear_all_chunks,
@@ -116,6 +119,27 @@ def rag_clear_route():
     n = clear_all_chunks()
     log.info("workspace.rag.clear chunks_removed=%s", n)
     return {"ok": True, "chunks_removed": n}
+
+
+@router.get("/companies")
+def get_workspace_companies():
+    ws.ensure_workspace_dirs()
+    rows = load_companies_list()
+    valid: list[WorkspaceCompany] = []
+    for row in rows:
+        try:
+            valid.append(WorkspaceCompany.model_validate(row))
+        except Exception:
+            continue
+    return {"companies": [c.model_dump() for c in valid]}
+
+
+@router.put("/companies")
+def put_workspace_companies(body: CompaniesPutBody):
+    ws.ensure_workspace_dirs()
+    save_companies_list(body.companies)
+    log.info("workspace.companies.put count=%s", len(body.companies))
+    return get_workspace_companies()
 
 
 @router.get("/checklist")

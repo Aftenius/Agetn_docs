@@ -15,12 +15,20 @@ import {
   type AnalyzePayload,
 } from "./documents/analyzeHistory";
 import { ContractEditor, type MarginPreset } from "./ContractEditor";
-import { getDocument, updateDocument } from "./documents/store";
+import {
+  ensureDocumentLoaded,
+  getDocument,
+  updateDocument,
+  type StoredDocument,
+} from "./documents/store";
 import { WizardForm } from "./WizardForm";
 
 export function EditorPage() {
   const { id } = useParams<{ id: string }>();
-  const doc = id ? getDocument(id) : null;
+  const [doc, setDoc] = useState<StoredDocument | null>(() =>
+    id ? getDocument(id) : null
+  );
+  const [docLoading, setDocLoading] = useState(() => Boolean(id && !getDocument(id)));
 
   const htmlRef = useRef<string>(doc?.html ?? "");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,6 +79,31 @@ export function EditorPage() {
       })
       .catch((e) => setAnalyzeErr(String(e)));
   }, []);
+
+  useEffect(() => {
+    if (!id) {
+      setDoc(null);
+      setDocLoading(false);
+      return;
+    }
+    const local = getDocument(id);
+    if (local) {
+      setDoc(local);
+      setDocLoading(false);
+      return;
+    }
+    setDocLoading(true);
+    let cancelled = false;
+    void ensureDocumentLoaded(id).then((d) => {
+      if (!cancelled) {
+        setDoc(d);
+        setDocLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (doc) htmlRef.current = doc.html;
@@ -181,7 +214,17 @@ export function EditorPage() {
     }
   };
 
-  if (!id || !doc) {
+  if (!id) {
+    return <Navigate to="/" replace />;
+  }
+  if (docLoading) {
+    return (
+      <div className="docs-home">
+        <p className="docs-home-hint">Загрузка документа…</p>
+      </div>
+    );
+  }
+  if (!doc) {
     return <Navigate to="/" replace />;
   }
 

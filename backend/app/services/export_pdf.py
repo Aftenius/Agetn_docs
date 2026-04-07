@@ -8,14 +8,14 @@ def build_html_document(inner_html: str) -> str:
   <style>
     body {{
       font-family: "Times New Roman", Times, serif;
-      font-size: 12pt;
+      font-size: 14pt;
       line-height: 1.35;
       margin: 2cm;
       color: #111;
     }}
     h1 {{ font-size: 16pt; text-align: center; }}
     h2 {{ font-size: 14pt; margin-top: 1em; }}
-    h3 {{ font-size: 12pt; margin-top: 0.8em; }}
+    h3 {{ font-size: 14pt; margin-top: 0.8em; }}
     p {{ margin: 0.35em 0; text-align: justify; }}
     ul {{ margin: 0.35em 0; padding-left: 1.4em; }}
   </style>

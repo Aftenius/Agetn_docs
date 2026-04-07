@@ -15,13 +15,15 @@
 
 Структура:
 
-- `settings.yaml` — название компании и инструкции по структуре генерации
+- `settings.yaml` — название компании и инструкции по структуре генерации (в т.ч. `generation.vat_rate_percent` — ставка НДС в процентах для промптов и подсказок, по умолчанию 22; меняется также в UI «Настройки workspace»)
 - `requirements.md`, `checklist.json` или DOCX чек-листа, шаблон договора DOCX
 - `templates/contracts/*.j2` — Jinja-шаблоны
 - `agents/*.yaml` — профили агентов проверки
 - `samples/` — примеры для мастера (аналог старой папки `docs/`)
 - `rag/inbox/` — загружаемые файлы для индексации
 - `rag_index/` — локальный индекс RAG (SQLite)
+- `companies.yaml` — реквизиты организаций для подстановки в договоры (редактор в UI или вручную)
+- `documents/` — сохранённые черновики договоров (JSON), синхронизация с библиотекой в браузере
 
 Скелет без секретов: [data/workspace/.example/](data/workspace/.example/).
 
@@ -45,10 +47,15 @@
 - Frontend: `cd frontend && npm install && npm run dev`
 - Docker: см. `docker-compose.yml`
 
-Переменные: скопируйте `.env.example` в `.env`, задайте `DEEPSEEK_API_KEY`. Для эмбеддингов RAG (опционально): `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`.
+Переменные: скопируйте `.env.example` в `.env`, задайте `DEEPSEEK_API_KEY`. Для эмбеддингов RAG (опционально): `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`. Если фронт открыт с другого origin (не `localhost:5173` / `8000`), перечислите его в `DOCS_AGENT_CORS_ORIGINS`.
+
+Черновики библиотеки при работающем backend дублируются в `workspace/documents/`; при недоступном API используются только данные в браузере.
 
 ## API (выборочно)
 
+- `GET/POST /api/documents`, `GET/PUT/DELETE /api/documents/{id}` — список и тела договоров в workspace
+- `GET /api/amount-in-words?value=` — сумма прописью
+- `GET/PUT /api/workspace/companies` — справочник реквизитов (`companies.yaml`)
 - `GET/PATCH /api/workspace/settings` — настройки workspace
 - `POST /api/workspace/rag/ingest` — загрузка файла в корпус RAG
 - `GET /api/workspace/rag/status` — статус индекса и список источников (`sources`)

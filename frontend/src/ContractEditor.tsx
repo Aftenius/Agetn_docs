@@ -79,17 +79,17 @@ const FONT_OPTIONS = [
 
 function currentFontFamily(editor: Editor): string {
   const raw = editor.getAttributes("textStyle").fontFamily as string | undefined;
-  if (!raw) return "Roboto";
+  if (!raw) return "Times New Roman";
   const normalized = raw.replace(/['"]/g, "").trim();
   return (FONT_OPTIONS as readonly string[]).includes(normalized)
     ? normalized
-    : "Roboto";
+    : "Times New Roman";
 }
 
 function currentFontSize(editor: Editor): string {
   const s = editor.getAttributes("textStyle").fontSize as string | undefined;
-  if (!s) return "11pt";
-  return (FONT_SIZES as readonly string[]).includes(s) ? s : "11pt";
+  if (!s) return "14pt";
+  return (FONT_SIZES as readonly string[]).includes(s) ? s : "14pt";
 }
 
 function currentTextAlign(editor: Editor): string {

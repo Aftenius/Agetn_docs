@@ -26,6 +26,59 @@ class ExportRequest(BaseModel):
     html: str
 
 
+class DocumentRecord(BaseModel):
+    id: str = Field(..., min_length=8, max_length=128)
+    title: str = Field(default="", max_length=500)
+    html: str = Field(default="")
+    updatedAt: str = Field(default="")
+
+
+class DocumentCreateBody(BaseModel):
+    id: str = Field(..., min_length=8, max_length=128)
+    title: str = Field(default="Без названия", max_length=500)
+    html: str = Field(default="")
+
+
+class DocumentPutBody(BaseModel):
+    title: str | None = Field(default=None, max_length=500)
+    html: str | None = None
+
+
+COMPANY_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+class WorkspaceCompany(BaseModel):
+    """Реквизиты стороны для подстановки в договор (файл workspace/companies.yaml)."""
+
+    id: str = Field(..., min_length=1, max_length=64)
+    display_name: str = Field(..., min_length=1, max_length=500)
+    full_legal_name: str = Field(default="", max_length=2000)
+    address_legal: str = Field(default="", max_length=2000)
+    ogrn: str = Field(default="", max_length=32)
+    inn: str = Field(default="", max_length=32)
+    kpp: str = Field(default="", max_length=32)
+    address_postal: str = Field(default="", max_length=2000)
+    bank_name: str = Field(default="", max_length=500)
+    rs: str = Field(default="", max_length=64)
+    ks: str = Field(default="", max_length=64)
+    bik: str = Field(default="", max_length=32)
+    signatory_title: str = Field(default="", max_length=200)
+    signatory_name: str = Field(default="", max_length=200)
+
+    @field_validator("id")
+    @classmethod
+    def validate_company_id(cls, v: str) -> str:
+        if not COMPANY_ID_PATTERN.match(v):
+            raise ValueError(
+                "id: только латиница, цифры, _ и - (1–64 символа)"
+            )
+        return v
+
+
+class CompaniesPutBody(BaseModel):
+    companies: list[WorkspaceCompany] = Field(default_factory=list)
+
+
 class GenerateStructureRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     subject: str = Field(
@@ -34,10 +87,53 @@ class GenerateStructureRequest(BaseModel):
         max_length=8000,
         description="Кратко: о чём договор, стороны, предмет",
     )
+    contract_format: str = Field(
+        default="supply",
+        description="supply | services (пока используется supply)",
+    )
+    company_id: str | None = Field(default=None, description="id из companies.yaml")
+    our_party: str = Field(
+        default="supplier",
+        description="supplier | buyer — наша сторона в договоре поставки",
+    )
+    vat_mode: str = Field(default="vat20", description="vat20 | no_vat")
+    vat_note: str = Field(default="", max_length=2000, description="основание без НДС")
+    total_amount: str = Field(
+        default="",
+        max_length=64,
+        description="сумма договора числом (строка для Decimal)",
+    )
+    amount_in_words: str = Field(
+        default="",
+        max_length=4000,
+        description="пропись с фронта или пусто — посчитать на сервере",
+    )
+    acceptance_days: int | None = Field(default=None, ge=1, le=3650)
+    payment_schedule_text: str = Field(default="", max_length=4000)
+    extra_terms: str = Field(default="", max_length=8000)
+    contract_number: str = Field(default="", max_length=128)
+    contract_date: str = Field(default="", max_length=128)
+
+    @field_validator("our_party")
+    @classmethod
+    def validate_our_party(cls, v: str) -> str:
+        x = (v or "supplier").strip().lower()
+        if x not in ("supplier", "buyer"):
+            raise ValueError("our_party: только supplier или buyer")
+        return x
+
+    @field_validator("vat_mode")
+    @classmethod
+    def validate_vat_mode(cls, v: str) -> str:
+        x = (v or "vat20").strip().lower()
+        if x not in ("vat20", "no_vat"):
+            raise ValueError("vat_mode: только vat20 или no_vat")
+        return x
 
 
 class WorkspaceGenerationPatch(BaseModel):
     structure_instructions: str | None = None
+    vat_rate_percent: int | None = Field(default=None, ge=0, le=100)
 
 
 class WorkspaceSettingsPatch(BaseModel):

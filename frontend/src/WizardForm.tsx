@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { fetchDocSamples, fetchTemplates, generateDraft } from "./api";
+import {
+  fetchDocSamples,
+  fetchTemplates,
+  fetchWorkspaceSettings,
+  generateDraft,
+} from "./api";
 import { applyEditorHtml } from "./ContractEditor";
 
 type Props = {
@@ -20,7 +25,7 @@ const defaultFieldsSupply: Record<string, string> = {
   subject: "",
   amount: "",
   currency: "руб.",
-  vat_text: "в том числе НДС 20%",
+  vat_text: "в том числе НДС 22%",
   payment_terms: "",
   delivery_terms: "",
   acceptance_terms: "",
@@ -47,7 +52,7 @@ const defaultFieldsServices: Record<string, string> = {
 
 export function WizardForm({ onClose, onApplied }: Props) {
   const [contractType, setContractType] = useState<"supply" | "services">(
-    "services"
+    "supply"
   );
   const [templateId, setTemplateId] = useState<string>("");
   const [templates, setTemplates] = useState<string[]>([]);
@@ -57,6 +62,7 @@ export function WizardForm({ onClose, onApplied }: Props) {
   const [fields, setFields] = useState<Record<string, string>>(() => ({
     ...defaultFieldsServices,
   }));
+  const [vatRateFromWs, setVatRateFromWs] = useState(22);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -65,21 +71,30 @@ export function WizardForm({ onClose, onApplied }: Props) {
     fetchDocSamples()
       .then((s) => setSamples(s))
       .catch(() => setSamples([]));
+    fetchWorkspaceSettings()
+      .then((ws) => {
+        const vr = ws.generation?.vat_rate_percent;
+        if (typeof vr === "number" && vr >= 0 && vr <= 100) {
+          setVatRateFromWs(vr);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
+    const vatLine = `в том числе НДС ${vatRateFromWs}%`;
     if (contractType === "supply") {
-      setFields({ ...defaultFieldsSupply });
+      setFields({ ...defaultFieldsSupply, vat_text: vatLine });
       const def =
         templates.find((t) => t.includes("supply")) ?? "supply.html.j2";
       setTemplateId(def);
     } else {
-      setFields({ ...defaultFieldsServices });
+      setFields({ ...defaultFieldsServices, vat_text: vatLine });
       const def =
         templates.find((t) => t.includes("services")) ?? "services.html.j2";
       setTemplateId(def);
     }
-  }, [contractType, templates]);
+  }, [contractType, templates, vatRateFromWs]);
 
   const setField = (k: string, v: string) => {
     setFields((f) => ({ ...f, [k]: v }));
